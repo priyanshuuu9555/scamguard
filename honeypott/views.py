@@ -79,14 +79,25 @@ def detect_scam(request):
     if request.headers.get("x-api-key") != API_KEY:
         return JsonResponse({"error": "Unauthorized"}, status=401)
 
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except json.JSONDecodeError:
+        data = {}
+
     message = data.get("message", "").lower()
     turn = int(data.get("turn", 1))
+
+    # 👇 REQUIRED for hackathon endpoint tester
+    if not message:
+        return JsonResponse({
+            "status": "ok",
+            "message": "Honeypot endpoint reachable",
+            "agent_active": False
+        })
 
     scam_type = detect_scam_type(message)
     scam_detected = scam_type != "unknown"
 
-    # STEP 3: agentic replies
     if scam_detected:
         replies = HUMAN_REPLIES.get(turn, HUMAN_REPLIES[4])
         reply = replies[0]
@@ -95,7 +106,6 @@ def detect_scam(request):
         reply = "Okay, thanks for the information."
         stage = 0
 
-    # STEP 4: intelligence extraction
     extracted = extract_intelligence(message)
 
     return JsonResponse({
